@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Blink — Beheer</title>
+  <style>
+    :root{--primary:#1F6FEB; --accent:#4B5563; --ink:#0B0F16; --muted:#6B7280; --bg:#F7FAFF; --card:#FFFFFF}
+    *{box-sizing:border-box}
+    body{font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;margin:0;color:var(--ink);background:var(--bg)}
+    .container{max-width:1000px;margin:0 auto;padding:16px}
+    h1,h2{margin:.2rem 0 1rem}
+    .btn{display:inline-flex;align-items:center;gap:.5rem;background:var(--primary);color:#fff;border:0;border-radius:12px;padding:.7rem 1rem;font-weight:700;cursor:pointer;text-decoration:none;justify-content:center}
+    .btn--ghost{background:#fff;color:var(--ink);border:1px solid #E5E7EB}
+    table{border-collapse:collapse;width:100%}
+    th,td{padding:.5rem;border-bottom:1px solid #E5E7EB;text-align:left}
+    .card{background:#fff;border:1px solid #E5E7EB;border-radius:16px;padding:1rem;margin-bottom:1rem}
+    input[type=checkbox]{transform:scale(1.1)}
+    input,select{width:100%;padding:.6rem;border:1px solid #CBD5E1;border-radius:10px}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:.8rem}
+    .note{color:var(--muted);font-size:.9rem}
+    @media (max-width: 640px){ .container{padding:12px} .btn{width:100%} .row{grid-template-columns:1fr} }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>Blink — Beheer (zaterdagen)</h1>
+
+  <!-- 1) GitHub koppeling -->
+  <div class="card">
+    <h2>GitHub-koppeling (eenmalig)</h2>
+    <div class="row">
+      <div><label>Owner (gebruikersnaam)</label><input id="ghOwner" value="larsvdvelden"></div>
+      <div><label>Repository</label><input id="ghRepo" value="blink"></div>
+      <div><label>Branch</label><input id="ghBranch" value="main"></div>
+      <div><label>Bestandspad</label><input id="ghPath" value="availability.json"></div>
+      <div class="row" style="grid-column:1 / -1">
+        <div><label>GitHub token (ghp_…)</label><input id="ghToken" type="password" placeholder="plak hier je token"></div>
+        <div style="display:flex;align-items:end"><button class="btn" id="saveCfg">Bewaar in deze browser</button></div>
+      </div>
+    </div>
+    <p id="cfgStatus" class="note"></p>
+  </div>
+
+  <!-- 2) Beschikbaarheid -->
+  <div class="card">
+    <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:.6rem">
+      <button class="btn btn--ghost" id="saveSat">Opslaan (lokaal)</button>
+      <button class="btn btn--ghost" id="clearSat">Leegmaken</button>
+      <button class="btn btn--ghost" id="exportSat">Exporteren (availability.json)</button>
+      <button class="btn" id="pushGitHub">⬆️ Opslaan naar GitHub</button>
+    </div>
+    <div style="overflow:auto">
+      <table id="satTable" class="small">
+        <thead><tr><th>Datum (zaterdag)</th><th>Beschikbaar</th><th>Status</th><th>Actie</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const SAT_KEY='blink-saturday-availability', BOOKED_KEY='blink-saturday-booked', CFG_KEY='blink-ghcfg';
+  const $=s=>document.querySelector(s);
+  function ymd(d){return d.toISOString().slice(0,10);}
+  function* saturdays(years=2){const d=new Date();d.setHours(0,0,0,0);const end=new Date(d);end.setFullYear(end.getFullYear()+years);d.setDate(d.getDate()+((6-d.getDay()+7)%7));while(d<=end){yield new Date(d);d.setDate(d.getDate()+7);}}
+  function b64(str){try{return btoa(unescape(encodeURIComponent(str)));}catch(e){return btoa(str);}}
+
+  function renderSatTable(){
+    const tb=$("#satTable tbody"); tb.innerHTML='';
+    const availability=JSON.parse(localStorage.getItem(SAT_KEY)||'{}');
+    const booked=JSON.parse(localStorage.getItem(BOOKED_KEY)||'{}');
+    for(const d of saturdays(2)){
+      const id=ymd(d);
+      const avail=availability[id] ?? true;
+      const isBooked=!!booked[id];
+      const tr=document.createElement('tr');
+      tr.innerHTML=`
+        <td>${d.toLocaleDateString('nl-NL',{weekday:'long', day:'2-digit', month:'2-digit', year:'numeric'})}</td>
+        <td><input type="checkbox" ${avail?'checked':''} ${isBooked?'disabled':''} data-date="${id}"></td>
+        <td>${isBooked?'Geboekt':(avail?'Open':'Geblokkeerd')}</td>
+        <td>${isBooked?`<button class="btn btn--ghost btn-cancel" data-date="${id}">Annuleer</button>`:''}</td>`;
+      tb.appendChild(tr);
+    }
+  }
+
+  $("#saveSat").addEventListener('click',()=>{
+    const availability=JSON.parse(localStorage.getItem(SAT_KEY)||'{}');
+    document.querySelectorAll('#satTable input[type=\"checkbox\"]').forEach(cb=>availability[cb.dataset.date]=cb.checked);
+    localStorage.setItem(SAT_KEY,JSON.stringify(availability));
+    alert('Beschikbaarheid opgeslagen (lokaal).'); renderSatTable();
+  });
+  $("#clearSat").addEventListener('click',()=>{localStorage.removeItem(SAT_KEY);alert('Lokaal leeggemaakt.');renderSatTable();});
+  document.addEventListener('click',e=>{
+    const btn=e.target.closest('.btn-cancel'); if(!btn) return;
+    const id=btn.dataset.date; if(confirm(`Boeking op ${id} annuleren en datum vrijmaken?`)){
+      const booked=JSON.parse(localStorage.getItem(BOOKED_KEY)||'{}'); delete booked[id];
+      localStorage.setItem(BOOKED_KEY,JSON.stringify(booked)); alert('Geannuleerd.'); renderSatTable();
+    }
+  });
+  $("#exportSat").addEventListener('click',()=>{
+    const availability=JSON.parse(localStorage.getItem(SAT_KEY)||'{}');
+    const booked=JSON.parse(localStorage.getItem(BOOKED_KEY)||'{}');
+    const data={generatedAt:new Date().toISOString(),availability,booked};
+    const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+    const url=URL.createObjectURL(blob); const a=document.createElement('a');
+    a.href=url; a.download='availability.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  });
+
+  function loadCfg(){const c=JSON.parse(localStorage.getItem(CFG_KEY)||'{}'); if(c.owner) $("#ghOwner").value=c.owner; if(c.repo) $("#ghRepo").value=c.repo; if(c.branch) $("#ghBranch").value=c.branch; if(c.path) $("#ghPath").value=c.path; if(c.token) $("#ghToken").value=c.token; $("#cfgStatus").textContent = c.owner?`Configuratie geladen voor ${c.owner}/${c.repo}`:'Nog geen configuratie opgeslagen.';}
+  $("#saveCfg").addEventListener('click',()=>{
+    const cfg={owner:$("#ghOwner").value.trim(), repo:$("#ghRepo").value.trim(), branch:$("#ghBranch").value.trim(), path:$("#ghPath").value.trim(), token:$("#ghToken").value.trim()};
+    if(!cfg.owner||!cfg.repo||!cfg.branch||!cfg.path||!cfg.token){alert('Vul alles in (owner, repo, branch, pad, token).');return;}
+    localStorage.setItem(CFG_KEY,JSON.stringify(cfg)); $("#cfgStatus").textContent=`Configuratie opgeslagen voor ${cfg.owner}/${cfg.repo}`; alert('GitHub-koppeling bewaard in deze browser.');
+  });
+
+  async function ghGetSha(cfg){
+    const url=`https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${cfg.path}?ref=${cfg.branch}`;
+    const res=await fetch(url,{headers:{Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28',Authorization:`Bearer ${cfg.token}`}});
+    if(res.status===200){const j=await res.json(); return j.sha;}
+    return null;
+  }
+  async function ghPutFile(cfg, content, message){
+    const sha=await ghGetSha(cfg).catch(()=>null);
+    const body={message, content: b64(content), branch:cfg.branch};
+    if(sha) body.sha=sha;
+    const url=`https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${cfg.path}`;
+    const res=await fetch(url,{method:'PUT',headers:{Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28',Authorization:`Bearer ${cfg.token}`},body:JSON.stringify(body)});
+    if(!res.ok){const t=await res.text(); throw new Error(`GitHub fout (${res.status}): ${t}`);} return res.json();
+  }
+
+  $("#pushGitHub").addEventListener('click', async ()=>{
+    const cfg=JSON.parse(localStorage.getItem(CFG_KEY)||'{}');
+    if(!cfg.token){alert('Vul eerst je GitHub token in en klik “Bewaar in deze browser”.'); return;}
+    const availability=JSON.parse(localStorage.getItem(SAT_KEY)||'{}');
+    document.querySelectorAll('#satTable input[type=\"checkbox\"]').forEach(cb=>availability[cb.dataset.date]=cb.checked);
+    const booked=JSON.parse(localStorage.getItem(BOOKED_KEY)||'{}');
+    const data={generatedAt:new Date().toISOString(),availability,booked};
+    try{ await ghPutFile(cfg, JSON.stringify(data,null,2), 'Update availability via beheer'); alert('Succes! availability.json geüpload naar GitHub.'); }
+    catch(err){ console.error(err); alert('Upload mislukt: '+err.message); }
+  });
+
+  loadCfg(); renderSatTable();
+</script>
+</body>
+</html>
