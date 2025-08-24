@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Blink — Boek je wasbeurt</title>
+  <style>
+    :root{--primary:#1F6FEB; --accent:#4B5563; --ink:#0B0F16; --muted:#6B7280; --bg:#F7FAFF; --card:#FFFFFF}
+    *{box-sizing:border-box}
+    body{font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;margin:0;color:var(--ink);background:var(--bg)}
+    .container{max-width:920px;margin:0 auto;padding:16px}
+    h1{margin:.2rem 0 1rem}
+    label{font-weight:600;display:block;margin:.2rem 0}
+    input,select{width:100%;padding:.8rem;border:1px solid #CBD5E1;border-radius:12px;background:#fff}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+    .option{display:flex;gap:.6rem;padding:.8rem;border:1px solid #E5E7EB;border-radius:12px;background:#fff;align-items:flex-start}
+    .option.off{opacity:.5;text-decoration:line-through}
+    .total{font-weight:800;font-size:1.2rem;margin:.6rem 0 0}
+    .btn{display:inline-flex;align-items:center;gap:.5rem;background:var(--primary);color:#fff;border:0;border-radius:12px;padding:.9rem 1.1rem;font-weight:700;cursor:pointer;text-decoration:none;justify-content:center}
+    .btn--ghost{background:#fff;color:var(--ink);border:1px solid #E5E7EB}
+    .note{font-size:.92rem;color:var(--muted)}
+    .card{background:#fff;border:1px solid #E5E7EB;border-radius:16px;padding:1rem}
+    #confirmScreen{position:fixed;inset:0;background:#fff;z-index:9999;display:none;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:2rem}
+    #confirmScreen h2{font-size:2rem;margin-bottom:1rem}
+    #confirmScreen p{font-size:1.1rem;margin-bottom:1rem}
+    #confirmLogo{max-width:180px;max-height:80px;margin-bottom:1rem;opacity:.95}
+    #confirmDetails{font-size:1rem;color:var(--muted);margin-bottom:1rem}
+    #confetti{position:absolute;inset:0;pointer-events:none}
+    #confirmActions{display:flex;gap:.6rem;flex-wrap:wrap;justify-content:center;margin-top:1rem}
+    @media (max-width: 720px){
+      .container{padding:12px}
+      h1{font-size:1.45rem}
+      .row{grid-template-columns:1fr}
+      .card{padding:.9rem}
+      .btn{width:100%}
+      #confirmScreen h2{font-size:1.6rem}
+      #confirmScreen p{font-size:1rem}
+      .option{padding:.7rem}
+      input,select{padding:.85rem}
+    }
+    input[type="checkbox"]{width:1.25em;height:1.25em;margin-top:.15rem}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Blink — Boek je wasbeurt</h1>
+
+    <form id="bookingForm" class="card">
+      <div class="row">
+        <div>
+          <label for="naam">Naam</label>
+          <input id="naam" required />
+        </div>
+        <div>
+          <label for="telefoon">Telefoon</label>
+          <input id="telefoon" type="tel" required />
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label for="model">Model auto</label>
+          <input id="model" required />
+        </div>
+        <div>
+          <label for="datumSelect">Gewenste zaterdag</label>
+          <select id="datumSelect" required></select>
+          <p class="note" id="dateNote" style="margin:.3rem 0 0"></p>
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label for="locatie">Locatie</label>
+          <select id="locatie">
+            <option value="grutto">Op Grutto 16 detailen</option>
+            <option value="thuis">Bij de klant thuis detailen</option>
+          </select>
+        </div>
+        <div id="adresWrap" style="display:none">
+          <label for="adres">Adres klant (alleen bij thuis)</label>
+          <input id="adres" placeholder="Straat, nr, plaats" />
+        </div>
+      </div>
+
+      <div>
+        <label>Diensten</label>
+        <div id="services" class="row">
+          <label class="option" id="optCombo"><input type="checkbox" id="svcCombo" data-price="25"/> Binnen & buiten (€25)</label>
+          <label class="option" id="optBinnen"><input type="checkbox" id="svcBinnen" data-price="15"/> Alleen binnen (€15)</label>
+          <label class="option" id="optBuiten"><input type="checkbox" id="svcBuiten" data-price="15"/> Alleen buiten (€15)</label>
+          <label class="option"><input type="checkbox" id="svcInterieurPlus" data-price="5"/> Interieur Plus (+€5)</label>
+          <label class="option"><input type="checkbox" id="svcDiepte" data-price="8"/> Bekleding dieptereiniging (+€8)</label>
+          <label class="option" id="optCeramic">
+            <input type="checkbox" id="svcCeramic" data-price="10"/>
+            <span>
+              <strong>Ceramic Wax</strong> (+€10)<br>
+              <span class="note">Bescherming tot ±3 maanden glans</span>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <p class="total">Totaal: <span id="totalPrice">€0</span></p>
+
+      <button type="submit" class="btn">Boek via WhatsApp</button>
+      <p class="note" style="margin-top:.4rem">Je boeking is pas definitief na bevestiging via WhatsApp. Check je spam/junkmap voor onze bevestiging.</p>
+    </form>
+  </div>
+
+  <div id="confirmScreen">
+    <canvas id="confetti"></canvas>
+    <img id="confirmLogo" src="logo-blink.png" alt="Blink logo" onerror="this.style.display='none'" />
+    <h2>✅ Je boeking is bevestigd!</h2>
+    <p>We hebben je aanvraag ontvangen en zien je graag op <span id="confirmDate"></span>.<br>Bedankt dat je voor Blink kiest! 🚗✨</p>
+    <p id="confirmDetails"></p>
+    <div id="confirmActions">
+      <a href="#" class="btn btn--ghost" id="addCalBtn">Voeg toe aan agenda (.ics)</a>
+      <a href="#" class="btn" id="continueBtn">Ga verder</a>
+    </div>
+  </div>
+
+<script>
+  const OWNER_PHONE_E164 = '31621240038';
+  function ymd(d){ return d.toISOString().slice(0,10); }
+  function* upcomingSaturdaysYears(years=2){
+    const d = new Date(); d.setHours(0,0,0,0);
+    const end = new Date(d); end.setFullYear(end.getFullYear()+years);
+    d.setDate(d.getDate() + ((6 - d.getDay() + 7) % 7));
+    while(d <= end){ yield new Date(d); d.setDate(d.getDate()+7); }
+  }
+  async function loadAvailability(){
+    try{ const res = await fetch('availability.json', {cache:'no-store'}); const data = await res.json();
+      return {availability: data.availability||{}, booked: data.booked||{}};
+    }catch(e){ return {availability: {}, booked: {}}; }
+  }
+  function updateDatumSelect(availability, booked){
+    const sel = document.getElementById('datumSelect'); sel.innerHTML=''; let count=0;
+    for(const d of upcomingSaturdaysYears(2)){
+      const id = ymd(d);
+      const open = (availability[id] ?? true) && !booked[id];
+      if(open){ const opt = document.createElement('option');
+        opt.value = id; opt.textContent = d.toLocaleDateString('nl-NL',{weekday:'long', day:'2-digit', month:'2-digit', year:'numeric'});
+        sel.appendChild(opt); count++; }
+    }
+    document.getElementById('dateNote').textContent = count ? '' : 'Geen beschikbare zaterdagen gevonden.';
+  }
+  const combo=document.getElementById('svcCombo'), binnen=document.getElementById('svcBinnen'), buiten=document.getElementById('svcBuiten'), plus=document.getElementById('svcInterieurPlus'), diepte=document.getElementById('svcDiepte'), ceramic=document.getElementById('svcCeramic');
+  const optBinnen=document.getElementById('optBinnen'), optBuiten=document.getElementById('optBuiten');
+  const priceEl=document.getElementById('totalPrice'); const locatieSel=document.getElementById('locatie');
+  const adresWrap=document.getElementById('adresWrap'); const adresInput=document.getElementById('adres');
+  function calc(){ let total=0; const chosen=[];
+    function add(el,name){ if(el && el.checked){ total+=Number(el.dataset.price||0); chosen.push(name); } }
+    add(combo,'Binnen & buiten'); add(binnen,'Alleen binnen'); add(buiten,'Alleen buiten'); add(plus,'Interieur Plus'); add(diepte,'Bekleding dieptereiniging'); add(ceramic,'Ceramic Wax');
+    priceEl.textContent='€'+total; return chosen; }
+  function toggleSingles(){
+    const off=combo.checked; [binnen,buiten].forEach(el=>{ if(!el) return; el.disabled=off; if(off) el.checked=false; });
+    if(optBinnen) optBinnen.classList.toggle('off',off); if(optBuiten) optBuiten.classList.toggle('off',off); calc(); }
+  [combo,binnen,buiten,plus,diepte,ceramic].forEach(el=> el?.addEventListener('change', ()=>{ if(el===combo) toggleSingles(); else calc(); }));
+  toggleSingles(); locatieSel.addEventListener('change', ()=>{ adresWrap.style.display = locatieSel.value==='thuis' ? 'block' : 'none'; });
+  let lastBooking=null;
+  document.getElementById('bookingForm').addEventListener('submit', async e=>{
+    e.preventDefault();
+    const name=document.getElementById('naam').value.trim(); const phone=document.getElementById('telefoon').value.trim();
+    const model=document.getElementById('model').value.trim(); const date=document.getElementById('datumSelect').value;
+    const loc=locatieSel.value; const addr=adresInput.value.trim();
+    if(loc==='thuis' && !addr){ alert('Vul het adres in voor thuis-detailen.'); return; }
+    const chosen=calc(); if(chosen.length===0){ alert('Kies minimaal één dienst.'); return; }
+    const total=priceEl.textContent; const locText = (loc==='thuis') ? `Bij klant thuis – ${addr}` : 'Grutto 16';
+    const waMsg=encodeURIComponent(`Boeking`+"\n\n"+`Naam: ${name}`+"\n"+`Telefoon: ${phone}`+"\n"+`Model: ${model}`+"\n"+`Datum: ${date}`+"\n"+`Locatie: ${locText}`+"\n"+`Diensten: ${chosen.join(', ')||'-'}`+"\n"+`Totaal: ${total}`);
+    try{ window.location.href = `https://wa.me/${OWNER_PHONE_E164}?text=${waMsg}`; }catch(e){ window.open(`https://wa.me/${OWNER_PHONE_E164}?text=${waMsg}`,'_self'); }
+    const nlDate = new Date(date).toLocaleDateString('nl-NL',{weekday:'long', day:'2-digit', month:'2-digit', year:'numeric'});
+    document.getElementById('confirmDate').textContent = nlDate;
+    document.getElementById('confirmDetails').textContent = `Gekozen: ${chosen.join(', ')} · Totaal: ${total} · Locatie: ${locText}`;
+    document.getElementById('confirmScreen').style.display='flex'; launchConfetti();
+    lastBooking = { name, phone, model, date, chosen, total, location: loc, address: addr };
+  });
+  document.getElementById('addCalBtn').addEventListener('click', (e)=>{ e.preventDefault(); if(!lastBooking) return; downloadICS(lastBooking); });
+  document.getElementById('continueBtn').addEventListener('click', e=>{ e.preventDefault(); document.getElementById('confirmScreen').style.display='none'; });
+  function pad(n){ return String(n).padStart(2,'0'); }
+  function buildLocalDT(dateStr, hh, mm){ const d = new Date(dateStr+'T00:00'); const y=d.getFullYear(), m=pad(d.getMonth()+1), day=pad(d.getDate()); return `${y}${m}${day}T${pad(hh)}${pad(mm)}00`; }
+  function downloadICS(b){
+    const dtStart = buildLocalDT(b.date, 9, 0), dtEnd   = buildLocalDT(b.date, 11, 0);
+    const locText = (b.location==='thuis' && b.address) ? b.address : 'Grutto 16';
+    const lines = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Blink//Booking//NL','CALSCALE:GREGORIAN','METHOD:PUBLISH','BEGIN:VEVENT',`UID:${Date.now()}@blink`,'SUMMARY:Blink – Autowas afspraak',`DESCRIPTION:Naam: ${b.name}\nTelefoon: ${b.phone}\nModel: ${b.model}\nDiensten: ${b.chosen.join(', ')}\nTotaal: ${b.total}\nLocatie: ${locText}`,`LOCATION:${locText.replace(/\r?\n/g,' ')}`,'TZID:Europe/Amsterdam',`DTSTART;TZID=Europe/Amsterdam:${dtStart}`,`DTEND;TZID=Europe/Amsterdam:${dtEnd}`,'END:VEVENT','END:VCALENDAR'];
+    const ics = lines.join('\r\n'); const blob = new Blob([ics], {type:'text/calendar'}); const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `Blink-boeking-${b.date}.ics`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  }
+  function launchConfetti(){
+    const canvas = document.getElementById('confetti'); const ctx = canvas.getContext('2d'); const dpr = window.devicePixelRatio || 1; const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr; canvas.height = rect.height * dpr; ctx.scale(dpr,dpr);
+    const W = rect.width, H = rect.height;
+    const pieces = Array.from({length:80}, ()=>({ x: Math.random()*W, y: -20 - Math.random()*H*0.3, r: 2+Math.random()*4, vy: 1+Math.random()*3, vx: (Math.random()-0.5)*2, rot: Math.random()*360, vr: (Math.random()-0.5)*8 }));
+    let t0=null; const dur=1600;
+    function step(ts){ if(!t0) t0=ts; const dt = ts - t0; ctx.clearRect(0,0,W,H);
+      pieces.forEach(p=>{ p.y += p.vy; p.x += p.vx; p.rot += p.vr; }); pieces.forEach(p=>{ ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot*Math.PI/180); ctx.fillRect(-p.r,-p.r,p.r*2,p.r*2); ctx.restore(); });
+      if(dt<dur) requestAnimationFrame(step); else ctx.clearRect(0,0,W,H); }
+    requestAnimationFrame(step);
+  }
+  loadAvailability().then(({availability, booked})=>{ updateDatumSelect(availability, booked); });
+</script>
+</body>
+</html>
